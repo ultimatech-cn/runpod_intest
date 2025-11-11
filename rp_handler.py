@@ -1,0 +1,92 @@
+import json
+import subprocess
+from pathlib import Path
+import base64
+import uuid
+import runpod
+
+
+def save_base64_to_file(data_base64: str, save_path: Path):
+    """保存 base64 编码的数据为文件"""
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(save_path, "wb") as f:
+        f.write(base64.b64decode(data_base64))
+    return save_path
+
+
+def update_workflow(image_path: str, audio_path: str) -> str:
+    """修改 workflow.json 文件，替换图像与音频输入路径"""
+    workflow_path = "/workspace/workflow/workflow.json"
+    workflow_data = json.loads(Path(workflow_path).read_text())
+
+    # 替换图像与音频输入路径
+    workflow_data["305"]["inputs"]["image"] = image_path
+    workflow_data["306"]["inputs"]["audio"] = audio_path
+
+    # 保存新的 workflow 文件（加随机名，避免冲突）
+    client_id = uuid.uuid4().hex
+    new_workflow_dir = Path("/workspace/ComfyUI/Json")
+    new_workflow_dir.mkdir(parents=True, exist_ok=True)
+    new_workflow_file = new_workflow_dir / f"{client_id}.json"
+
+    with open(new_workflow_file, "w") as f:
+        json.dump(workflow_data, f)
+
+    return str(new_workflow_file)
+
+def run_infer(workflow_file: str) -> Path:
+    """运行 ComfyUI 工作流生成视频（只取最新的 *audio.mp4 文件）"""
+    
+    # 输出目录
+    output_dir = Path("/workspace/ComfyUI/output/Wan21")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 🚀 运行 ComfyUI（最长等待 30 分钟）
+    cmd = f"comfy run --workflow {workflow_file} --wait --timeout 1800 --verbose"
+    subprocess.run(cmd, shell=True, check=True)
+
+    # 🎯 查找所有文件名包含 "audio.mp4" 的视频
+    audio_videos = list(output_dir.glob("*audio.mp4"))
+    if not audio_videos:
+        print(f"Warning: no *audio.mp4 file found in {output_dir}")
+        return None
+
+    # 按修改时间排序，取最新的一个
+    latest_audio_video = max(audio_videos, key=lambda f: f.stat().st_mtime)
+    print(f"[INFO] Latest audio video file: {latest_audio_video}")
+
+    return latest_audio_video
+
+
+
+def handler(event):
+    print("Received event:", event)
+
+    # 从输入中取出 base64 编码的图片和音频
+    image_b64 = event.get("input", {}).get("image_base64", "")
+    audio_b64 = event.get("input", {}).get("audio_base64", "")
+
+    if not image_b64 or not audio_b64:
+        return {"error": "missing image or audio input"}
+
+    # 保存输入文件
+    input_dir = Path("/workspace/input")
+    image_path = save_base64_to_file(image_b64, input_dir / "input_image.png")
+    audio_path = save_base64_to_file(audio_b64, input_dir / "input_audio.wav")
+
+    # 修改 workflow 并运行推理
+    workflow_file = update_workflow(str(image_path), str(audio_path))
+    video_path = run_infer(workflow_file)
+
+    # 返回结果
+    if video_path and video_path.exists():
+        with open(video_path, "rb") as f:
+            video_bytes = f.read()
+            video_base64 = base64.b64encode(video_bytes).decode("utf-8")
+        return {"video_base64": video_base64}
+    else:
+        return {"error": "video not found or generation failed"}
+
+
+if __name__ == "__main__":
+    runpod.serverless.start({"handler": handler})

@@ -1,0 +1,42 @@
+# ===== 基础镜像 =====
+FROM runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
+
+# ===== 环境变量 =====
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PIP_PREFER_BINARY=1
+ENV CMAKE_BUILD_PARALLEL_LEVEL=4
+
+# ===== 安装基础依赖 =====
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa -y \
+    && apt-get update \
+    && apt-get install -y \
+        python3.12 \
+        python3.12-venv \
+        python3-distutils \
+        python3-pip \
+        git \
+        wget \
+        libgl1 \
+        libglib2.0-0 \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \
+    && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# ===== 升级 pip、setuptools、wheel =====
+RUN pip3 install --upgrade pip setuptools wheel
+# ===== 安装 uv（更快的 pip）=====
+RUN pip3 install --no-cache-dir uv
+# ===== 安装 comfy-cli =====
+RUN uv pip install --upgrade comfy-cli --system
+# ===== 安装运行时依赖 =====
+RUN uv pip install runpod requests --system
+# ===== 拷贝代码 =====
+COPY rp_handler.py /rp_handler.py
+COPY start.sh /start.sh
+# ===== 处理脚本换行符并授权执行 =====
+RUN apt-get update && apt-get install -y dos2unix && rm -rf /var/lib/apt/lists/*
+RUN dos2unix /start.sh && chmod +x /start.sh
+# ===== 启动入口 =====
+ENTRYPOINT ["/start.sh"]
