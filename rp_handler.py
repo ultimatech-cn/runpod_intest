@@ -130,6 +130,23 @@ if __name__ == "__main__":
     if missing_vars:
         print(f"[WARNING] Missing environment variables: {missing_vars}", flush=True)
         print("[WARNING] Handler may not work correctly without these variables", flush=True)
+        
+        # 尝试从其他环境变量中获取 API KEY
+        if "RUNPOD_API_KEY" in missing_vars:
+            # 检查是否有 RUNPOD_AI_API_KEY 或 RUNPOD_ENDPOINT_SECRET
+            ai_api_key = os.environ.get("RUNPOD_AI_API_KEY")
+            endpoint_secret = os.environ.get("RUNPOD_ENDPOINT_SECRET")
+            
+            if ai_api_key:
+                print("[INFO] Found RUNPOD_AI_API_KEY, setting RUNPOD_API_KEY from it...", flush=True)
+                os.environ["RUNPOD_API_KEY"] = ai_api_key
+                print("[INFO] RUNPOD_API_KEY has been set from RUNPOD_AI_API_KEY", flush=True)
+            elif endpoint_secret:
+                print("[INFO] Found RUNPOD_ENDPOINT_SECRET, setting RUNPOD_API_KEY from it...", flush=True)
+                os.environ["RUNPOD_API_KEY"] = endpoint_secret
+                print("[INFO] RUNPOD_API_KEY has been set from RUNPOD_ENDPOINT_SECRET", flush=True)
+            else:
+                print("[ERROR] No alternative API key found! RUNPOD_API_KEY is required!", flush=True)
     
     # 检查所有 RUNPOD 相关的环境变量
     runpod_envs = {k: v for k, v in os.environ.items() if k.startswith("RUNPOD")}
