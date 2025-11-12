@@ -3,7 +3,24 @@ import subprocess
 from pathlib import Path
 import base64
 import uuid
+import os
 import runpod
+
+# 自动检测 ComfyUI 路径（兼容不同的 RunPod 模式）
+def get_comfyui_path():
+    """检测并返回 ComfyUI 的正确路径"""
+    # 优先检查 /workspace/ComfyUI（软连接模式）
+    workspace_comfy = Path("/workspace/ComfyUI")
+    if workspace_comfy.exists():
+        return str(workspace_comfy)
+    
+    # 如果不存在，检查 /runpod-volume/ComfyUI（直接挂载模式）
+    runpod_comfy = Path("/runpod-volume/ComfyUI")
+    if runpod_comfy.exists():
+        return str(runpod_comfy)
+    
+    # 如果都不存在，默认使用 /workspace/ComfyUI
+    return "/workspace/ComfyUI"
 
 
 def save_base64_to_file(data_base64: str, save_path: Path):
@@ -16,7 +33,20 @@ def save_base64_to_file(data_base64: str, save_path: Path):
 
 def update_workflow(image_path: str, audio_path: str) -> str:
     """修改 workflow.json 文件，替换图像与音频输入路径"""
-    workflow_path = "/workspace/workflow/workflow.json"
+    # 检测 workflow 路径（兼容不同模式）
+    workflow_paths = [
+        "/workspace/workflow/workflow.json",
+        "/runpod-volume/workflow/workflow.json"
+    ]
+    workflow_path = None
+    for path in workflow_paths:
+        if Path(path).exists():
+            workflow_path = path
+            break
+    
+    if not workflow_path:
+        raise FileNotFoundError(f"Workflow file not found in {workflow_paths}")
+    
     workflow_data = json.loads(Path(workflow_path).read_text())
 
     # 替换图像与音频输入路径
@@ -25,7 +55,8 @@ def update_workflow(image_path: str, audio_path: str) -> str:
 
     # 保存新的 workflow 文件（加随机名，避免冲突）
     client_id = uuid.uuid4().hex
-    new_workflow_dir = Path("/workspace/ComfyUI/Json")
+    comfyui_path = get_comfyui_path()
+    new_workflow_dir = Path(comfyui_path) / "Json"
     new_workflow_dir.mkdir(parents=True, exist_ok=True)
     new_workflow_file = new_workflow_dir / f"{client_id}.json"
 
@@ -37,8 +68,9 @@ def update_workflow(image_path: str, audio_path: str) -> str:
 def run_infer(workflow_file: str) -> Path:
     """运行 ComfyUI 工作流生成视频（只取最新的 *audio.mp4 文件）"""
     
-    # 输出目录
-    output_dir = Path("/workspace/ComfyUI/output/Wan21")
+    # 输出目录（使用检测到的 ComfyUI 路径）
+    comfyui_path = get_comfyui_path()
+    output_dir = Path(comfyui_path) / "output" / "Wan21"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 🚀 运行 ComfyUI（最长等待 30 分钟）
@@ -82,8 +114,19 @@ def handler(job):
     if not image_b64 or not audio_b64:
         return {"error": "missing image or audio input"}
 
-    # 保存输入文件
-    input_dir = Path("/workspace/input")
+    # 保存输入文件（检测输入目录路径）
+    input_paths = ["/workspace/input", "/runpod-volume/input"]
+    input_dir = None
+    for path in input_paths:
+        if Path(path).exists():
+            input_dir = Path(path)
+            break
+    
+    if not input_dir:
+        # 如果都不存在，创建 /workspace/input
+        input_dir = Path("/workspace/input")
+        input_dir.mkdir(parents=True, exist_ok=True)
+    
     image_path = save_base64_to_file(image_b64, input_dir / "input_image.png")
     audio_path = save_base64_to_file(audio_b64, input_dir / "input_audio.wav")
 
