@@ -65,15 +65,15 @@ def handler(job):
     根据官方文档: https://docs.runpod.io/serverless/workers/handler-functions
     job 是一个字典，包含 "id" 和 "input" 字段
     """
-    print(f"[INFO] Received job: {type(job)}", flush=True)
-    print(f"[INFO] Job keys: {list(job.keys()) if isinstance(job, dict) else 'N/A'}", flush=True)
+    print(f"[HANDLER] Received job: {type(job)}", flush=True)
+    print(f"[HANDLER] Job keys: {list(job.keys()) if isinstance(job, dict) else 'N/A'}", flush=True)
     
     # 根据官方文档，job 是一个字典，包含 "id" 和 "input" 字段
     # job["input"] 包含客户端发送的数据
     job_input = job["input"]  # 按照官方文档的标准格式
     
-    print(f"[INFO] Job input type: {type(job_input)}", flush=True)
-    print(f"[INFO] Job input keys: {list(job_input.keys()) if isinstance(job_input, dict) else 'N/A'}", flush=True)
+    print(f"[HANDLER] Job input type: {type(job_input)}", flush=True)
+    print(f"[HANDLER] Job input keys: {list(job_input.keys()) if isinstance(job_input, dict) else 'N/A'}", flush=True)
     
     # 从输入中取出 base64 编码的图片和音频
     image_b64 = job_input.get("image_base64", "")
@@ -103,217 +103,21 @@ def handler(job):
 
 if __name__ == "__main__":
     import os
-    import sys
-    import time
-    import signal
     
-    # 添加信号处理，防止进程被意外终止
-    def signal_handler(signum, frame):
-        print(f"[WARNING] Received signal {signum}", flush=True)
-        print(f"[WARNING] Signal frame: {frame}", flush=True)
-        # 不要立即退出，给一些时间记录日志
-        time.sleep(5)
-        sys.exit(1)
-    
-    # 注册信号处理器
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-    print("[INFO] Signal handlers registered", flush=True)
-    
-    print("=" * 80, flush=True)
-    print("[INFO] RunPod Handler starting...", flush=True)
-    print("=" * 80, flush=True)
-    
-    print(f"[INFO] Python version: {sys.version}", flush=True)
-    print(f"[INFO] RunPod version: {runpod.__version__ if hasattr(runpod, '__version__') else 'unknown'}", flush=True)
-    
-    # 检查关键环境变量
-    env_vars = ["RUNPOD_POD_ID", "RUNPOD_API_KEY", "RUNPOD_ENDPOINT_ID"]
-    print("[INFO] Checking environment variables:", flush=True)
-    missing_vars = []
-    for var in env_vars:
-        value = os.environ.get(var, "NOT SET")
-        if value == "NOT SET":
-            missing_vars.append(var)
-        # 隐藏敏感信息
-        if "KEY" in var and value != "NOT SET":
-            value = f"{value[:8]}...{value[-4:]}" if len(value) > 12 else "***"
-        print(f"  {var}: {value}", flush=True)
-    
-    if missing_vars:
-        print(f"[WARNING] Missing environment variables: {missing_vars}", flush=True)
-        print("[WARNING] Handler may not work correctly without these variables", flush=True)
-        
+    # 快速检查并设置 RUNPOD_API_KEY（如果需要）
+    # 这是唯一必要的启动前检查，因为它是 RunPod 正常工作的关键
+    if not os.environ.get("RUNPOD_API_KEY"):
         # 尝试从其他环境变量中获取 API KEY
-        if "RUNPOD_API_KEY" in missing_vars:
-            # 检查是否有 RUNPOD_AI_API_KEY 或 RUNPOD_ENDPOINT_SECRET
-            ai_api_key = os.environ.get("RUNPOD_AI_API_KEY")
-            endpoint_secret = os.environ.get("RUNPOD_ENDPOINT_SECRET")
-            
-            if ai_api_key:
-                print("[INFO] Found RUNPOD_AI_API_KEY, setting RUNPOD_API_KEY from it...", flush=True)
-                os.environ["RUNPOD_API_KEY"] = ai_api_key
-                print("[INFO] RUNPOD_API_KEY has been set from RUNPOD_AI_API_KEY", flush=True)
-            elif endpoint_secret:
-                print("[INFO] Found RUNPOD_ENDPOINT_SECRET, setting RUNPOD_API_KEY from it...", flush=True)
-                os.environ["RUNPOD_API_KEY"] = endpoint_secret
-                print("[INFO] RUNPOD_API_KEY has been set from RUNPOD_ENDPOINT_SECRET", flush=True)
-            else:
-                print("[ERROR] No alternative API key found! RUNPOD_API_KEY is required!", flush=True)
+        ai_api_key = os.environ.get("RUNPOD_AI_API_KEY")
+        endpoint_secret = os.environ.get("RUNPOD_ENDPOINT_SECRET")
+        
+        if ai_api_key:
+            os.environ["RUNPOD_API_KEY"] = ai_api_key
+            print("[INFO] Set RUNPOD_API_KEY from RUNPOD_AI_API_KEY", flush=True)
+        elif endpoint_secret:
+            os.environ["RUNPOD_API_KEY"] = endpoint_secret
+            print("[INFO] Set RUNPOD_API_KEY from RUNPOD_ENDPOINT_SECRET", flush=True)
     
-    # 检查所有 RUNPOD 相关的环境变量
-    runpod_envs = {k: v for k, v in os.environ.items() if k.startswith("RUNPOD")}
-    print(f"[INFO] All RUNPOD environment variables: {len(runpod_envs)} found", flush=True)
-    if runpod_envs:
-        print("[INFO] RUNPOD environment variables:", flush=True)
-        for k, v in runpod_envs.items():
-            # 隐藏敏感信息
-            if "KEY" in k or "SECRET" in k:
-                v = f"{v[:8]}...{v[-4:]}" if len(v) > 12 else "***"
-            print(f"  {k}: {v}", flush=True)
-    
-    # 检查是否是 serverless 模式
-    is_serverless = os.environ.get("RUNPOD_POD_ID") is not None
-    print(f"[INFO] Serverless mode detected: {is_serverless}", flush=True)
-    
-    if not is_serverless:
-        print("[WARNING] RUNPOD_POD_ID not found - this may not be a serverless environment", flush=True)
-        print("[WARNING] Handler may not work correctly", flush=True)
-    
-    # 检查工作目录和关键路径
-    print("[INFO] Checking workspace paths:", flush=True)
-    workspace_paths = [
-        "/workspace",
-        "/workspace/ComfyUI",
-        "/workspace/workflow",
-        "/workspace/input"
-    ]
-    for path in workspace_paths:
-        exists = os.path.exists(path)
-        print(f"  {path}: {'EXISTS' if exists else 'MISSING'}", flush=True)
-    
-    print("[INFO] Starting RunPod serverless handler...", flush=True)
-    print("[INFO] This is a blocking call - handler will wait for requests...", flush=True)
-    print("=" * 80, flush=True)
-    sys.stdout.flush()
-    
-    # 添加一个启动成功的标记
-    try:
-        print("[INFO] Calling runpod.serverless.start()...", flush=True)
-        print("[INFO] If you see this message, the handler is attempting to start...", flush=True)
-        sys.stdout.flush()
-        
-        # 尝试启动 RunPod serverless handler
-        # runpod.serverless.start() 是一个阻塞调用，会一直运行等待请求
-        # 它应该启动一个 HTTP 服务器并等待请求
-        print("[INFO] About to call runpod.serverless.start()...", flush=True)
-        
-        # 检查 runpod 模块是否可用
-        try:
-            import runpod.serverless
-            print(f"[INFO] runpod.serverless module loaded: {runpod.serverless}", flush=True)
-        except Exception as e:
-            print(f"[ERROR] Failed to import runpod.serverless: {e}", flush=True)
-            raise
-        
-        # 调用 start 方法
-        print("[INFO] Calling runpod.serverless.start() now...", flush=True)
-        print("[INFO] Note: runpod.serverless.start() should output 'Starting Serverless Worker'", flush=True)
-        print("[INFO] If you see that message, the handler is starting correctly", flush=True)
-        sys.stdout.flush()
-        
-        # 使用 threading 在后台定期输出心跳，证明进程还在运行
-        import threading
-        import time as time_module
-        
-        def heartbeat():
-            # 立即输出第一次心跳，然后每3秒输出一次
-            time_module.sleep(1)  # 等待 start() 开始初始化
-            count = 0
-            while True:
-                count += 1
-                elapsed = count * 3
-                print(f"[HEARTBEAT] Handler still running... ({elapsed}s)", flush=True)
-                time_module.sleep(3)  # 每3秒输出一次心跳
-        
-        heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
-        heartbeat_thread.start()
-        print("[INFO] Heartbeat thread started - will report every 3 seconds (first after 1s)", flush=True)
-        sys.stdout.flush()
-        
-        # 在调用 start() 之前输出确认消息
-        print("[INFO] About to enter runpod.serverless.start() - this will block...", flush=True)
-        print("[INFO] If handler is working, you should see heartbeat messages every 3 seconds", flush=True)
-        print("[INFO] RunPod will ping every 4 seconds (RUNPOD_PING_INTERVAL: 4000ms)", flush=True)
-        sys.stdout.flush()
-        
-        # 检查 handler 的类型和签名（在调用 start() 之前）
-        import inspect
-        print(f"[DEBUG] Handler type: {type(handler)}", flush=True)
-        print(f"[DEBUG] Handler is callable: {callable(handler)}", flush=True)
-        try:
-            sig = inspect.signature(handler)
-            print(f"[DEBUG] Handler signature: {sig}", flush=True)
-        except Exception as e:
-            print(f"[DEBUG] Could not get handler signature: {e}", flush=True)
-        
-        sys.stdout.flush()
-        
-        # 关键诊断：检查 start() 方法本身
-        print("[DEBUG] Checking runpod.serverless.start method...", flush=True)
-        print(f"[DEBUG] start method type: {type(runpod.serverless.start)}", flush=True)
-        print(f"[DEBUG] start method is callable: {callable(runpod.serverless.start)}", flush=True)
-        sys.stdout.flush()
-        
-        # 调用 start() - 这是一个阻塞调用
-        # 注意：start() 内部会输出 "Starting Serverless Worker"
-        print("[INFO] Calling runpod.serverless.start() NOW - this should block forever...", flush=True)
-        print("[INFO] NOTE: start() should block and output 'Starting Serverless Worker'", flush=True)
-        print("[INFO] If you see 'Starting Serverless Worker' but no heartbeat, container may be removed", flush=True)
-        print("[INFO] Attempting standard start() call...", flush=True)
-        
-        # 在调用前强制刷新所有输出
-        sys.stdout.flush()
-        sys.stderr.flush()
-        
-        # 关键：在调用 start() 之前，先输出一个标记
-        print("[CRITICAL] About to call runpod.serverless.start() - if this is the last message, start() may have failed silently", flush=True)
-        sys.stdout.flush()
-        
-        try:
-            # 这是关键调用 - 应该阻塞
-            # 注意：start() 会立即输出 "Starting Serverless Worker"，然后阻塞
-            result = runpod.serverless.start({"handler": handler})
-            # 如果到达这里，说明 start() 返回了（不应该发生）
-            print(f"[WARNING] start() returned: {result}", flush=True)
-            print("[WARNING] This should not happen - start() should block forever", flush=True)
-        except Exception as start_error:
-            print(f"[ERROR] start() raised exception: {start_error}", flush=True)
-            print(f"[ERROR] Exception type: {type(start_error).__name__}", flush=True)
-            import traceback
-            traceback.print_exc(file=sys.stdout)
-            sys.stdout.flush()
-            raise
-        
-    except KeyboardInterrupt:
-        print("[INFO] Handler interrupted by user", flush=True)
-        sys.exit(0)
-    except SystemExit as e:
-        print(f"[INFO] Handler exited with code: {e.code}", flush=True)
-        # 在退出前等待一段时间，以便查看日志
-        print("[INFO] Waiting 10 seconds before exit to allow log viewing...", flush=True)
-        time.sleep(10)
-        raise
-    except Exception as e:
-        print(f"[ERROR] Failed to start RunPod handler: {e}", flush=True)
-        print(f"[ERROR] Exception type: {type(e).__name__}", flush=True)
-        import traceback
-        print("[ERROR] Full traceback:", flush=True)
-        traceback.print_exc(file=sys.stdout)
-        sys.stdout.flush()
-        # 在退出前等待一段时间，以便查看日志
-        print("[ERROR] Waiting 30 seconds before exit to allow log viewing...", flush=True)
-        time.sleep(30)
-        sys.exit(1)
-    finally:
-        print("[INFO] Handler process ending...", flush=True)
+    # 参考 handler_example.py 的简洁启动方式
+    print("[INFO] Starting RunPod handler...", flush=True)
+    runpod.serverless.start({"handler": handler})
