@@ -234,11 +234,7 @@ if __name__ == "__main__":
         print("[INFO] RunPod will ping every 4 seconds (RUNPOD_PING_INTERVAL: 4000ms)", flush=True)
         sys.stdout.flush()
         
-        # 调用 start() - 这是一个阻塞调用
-        # 注意：start() 内部会输出 "Starting Serverless Worker"
-        print("[INFO] Calling runpod.serverless.start() NOW - this should block forever...", flush=True)
-        
-        # 检查 handler 的类型和签名
+        # 检查 handler 的类型和签名（在调用 start() 之前）
         import inspect
         print(f"[DEBUG] Handler type: {type(handler)}", flush=True)
         print(f"[DEBUG] Handler is callable: {callable(handler)}", flush=True)
@@ -254,21 +250,26 @@ if __name__ == "__main__":
         print("[DEBUG] Checking runpod.serverless.start method...", flush=True)
         print(f"[DEBUG] start method type: {type(runpod.serverless.start)}", flush=True)
         print(f"[DEBUG] start method is callable: {callable(runpod.serverless.start)}", flush=True)
-        
-        # 尝试不同的调用方式
-        # 方式1: 标准调用
-        print("[INFO] Attempting standard start() call...", flush=True)
-        print("[INFO] NOTE: start() should block and output 'Starting Serverless Worker'", flush=True)
-        print("[INFO] If you see 'Starting Serverless Worker' but no heartbeat, container may be removed", flush=True)
         sys.stdout.flush()
         
+        # 调用 start() - 这是一个阻塞调用
+        # 注意：start() 内部会输出 "Starting Serverless Worker"
+        print("[INFO] Calling runpod.serverless.start() NOW - this should block forever...", flush=True)
+        print("[INFO] NOTE: start() should block and output 'Starting Serverless Worker'", flush=True)
+        print("[INFO] If you see 'Starting Serverless Worker' but no heartbeat, container may be removed", flush=True)
+        print("[INFO] Attempting standard start() call...", flush=True)
+        
         # 在调用前强制刷新所有输出
-        import sys
         sys.stdout.flush()
         sys.stderr.flush()
         
+        # 关键：在调用 start() 之前，先输出一个标记
+        print("[CRITICAL] About to call runpod.serverless.start() - if this is the last message, start() may have failed silently", flush=True)
+        sys.stdout.flush()
+        
         try:
             # 这是关键调用 - 应该阻塞
+            # 注意：start() 会立即输出 "Starting Serverless Worker"，然后阻塞
             result = runpod.serverless.start({"handler": handler})
             # 如果到达这里，说明 start() 返回了（不应该发生）
             print(f"[WARNING] start() returned: {result}", flush=True)
