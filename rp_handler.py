@@ -59,12 +59,29 @@ def run_infer(workflow_file: str) -> Path:
 
 
 
-def handler(event):
-    print("Received event:", event)
-
+def handler(job):
+    """
+    RunPod serverless handler 函数
+    参数: job - 包含 input 字段的字典
+    返回: 处理结果字典
+    """
+    print(f"[INFO] Received job: {type(job)}", flush=True)
+    
+    # 兼容不同的参数格式
+    # RunPod 可能传递 job 对象或字典
+    if hasattr(job, "input"):
+        input_data = job.input
+    elif isinstance(job, dict):
+        input_data = job.get("input", {})
+    else:
+        # 如果 job 本身就是 input 数据
+        input_data = job if isinstance(job, dict) else {}
+    
+    print(f"[INFO] Input data type: {type(input_data)}", flush=True)
+    
     # 从输入中取出 base64 编码的图片和音频
-    image_b64 = event.get("input", {}).get("image_base64", "")
-    audio_b64 = event.get("input", {}).get("audio_base64", "")
+    image_b64 = input_data.get("image_base64", "") if isinstance(input_data, dict) else ""
+    audio_b64 = input_data.get("audio_base64", "") if isinstance(input_data, dict) else ""
 
     if not image_b64 or not audio_b64:
         return {"error": "missing image or audio input"}
