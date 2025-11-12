@@ -74,12 +74,21 @@ echo "[INFO] Also displaying output in console..."
 # 启动 handler 并保持运行
 # 注意：runpod.serverless.start() 是一个阻塞调用，应该一直运行
 # 如果它退出，容器会被移除
+echo "[INFO] Launching handler process..."
 python -u /rp_handler.py 2>&1 | tee /workspace/rp_handler.log
 
 # 如果 handler 退出，记录退出信息
 HANDLER_EXIT_CODE=$?
+echo "[ERROR] ========================================"
 echo "[ERROR] Handler process exited with code: $HANDLER_EXIT_CODE"
 echo "[ERROR] This will cause the container to be removed"
+echo "[ERROR] ========================================"
+echo "[ERROR] Last 50 lines of handler log:"
+tail -n 50 /workspace/rp_handler.log || echo "[ERROR] Could not read log file"
+echo "[ERROR] ========================================"
+
+# 等待一段时间以便查看日志（但不要等太久，否则会延迟重启）
+sleep 5
 exit $HANDLER_EXIT_CODE
 
 
