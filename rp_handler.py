@@ -183,28 +183,36 @@ if __name__ == "__main__":
         import time as time_module
         
         def heartbeat():
-            # 立即输出第一次心跳，然后每5秒输出一次
-            time_module.sleep(2)  # 等待 start() 开始初始化
+            # 立即输出第一次心跳，然后每3秒输出一次
+            time_module.sleep(1)  # 等待 start() 开始初始化
             count = 0
             while True:
                 count += 1
-                elapsed = count * 5
+                elapsed = count * 3
                 print(f"[HEARTBEAT] Handler still running... ({elapsed}s)", flush=True)
-                time_module.sleep(5)  # 每5秒输出一次心跳
+                time_module.sleep(3)  # 每3秒输出一次心跳
         
         heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
         heartbeat_thread.start()
-        print("[INFO] Heartbeat thread started - will report every 5 seconds (first after 2s)", flush=True)
+        print("[INFO] Heartbeat thread started - will report every 3 seconds (first after 1s)", flush=True)
         sys.stdout.flush()
         
         # 在调用 start() 之前输出确认消息
         print("[INFO] About to enter runpod.serverless.start() - this will block...", flush=True)
-        print("[INFO] If handler is working, you should see heartbeat messages every 5 seconds", flush=True)
+        print("[INFO] If handler is working, you should see heartbeat messages every 3 seconds", flush=True)
+        print("[INFO] RunPod will ping every 4 seconds (RUNPOD_PING_INTERVAL: 4000ms)", flush=True)
         sys.stdout.flush()
         
         # 调用 start() - 这是一个阻塞调用
         # 注意：start() 内部会输出 "Starting Serverless Worker"
+        print("[INFO] Calling runpod.serverless.start() NOW - this should block forever...", flush=True)
+        sys.stdout.flush()
+        
         result = runpod.serverless.start({"handler": handler})
+        
+        # 在 start() 调用后立即输出（虽然不应该到达这里）
+        print("[INFO] After runpod.serverless.start() call...", flush=True)
+        sys.stdout.flush()
         
         # 如果 start() 返回了（不应该发生），记录信息
         print(f"[WARNING] runpod.serverless.start() returned: {result}", flush=True)
