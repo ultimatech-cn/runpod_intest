@@ -92,6 +92,20 @@ if __name__ == "__main__":
     import os
     import sys
     import time
+    import signal
+    
+    # 添加信号处理，防止进程被意外终止
+    def signal_handler(signum, frame):
+        print(f"[WARNING] Received signal {signum}", flush=True)
+        print(f"[WARNING] Signal frame: {frame}", flush=True)
+        # 不要立即退出，给一些时间记录日志
+        time.sleep(5)
+        sys.exit(1)
+    
+    # 注册信号处理器
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    print("[INFO] Signal handlers registered", flush=True)
     
     print("=" * 80, flush=True)
     print("[INFO] RunPod Handler starting...", flush=True)
@@ -206,17 +220,31 @@ if __name__ == "__main__":
         # 调用 start() - 这是一个阻塞调用
         # 注意：start() 内部会输出 "Starting Serverless Worker"
         print("[INFO] Calling runpod.serverless.start() NOW - this should block forever...", flush=True)
+        
+        # 检查 handler 的类型和签名
+        import inspect
+        print(f"[DEBUG] Handler type: {type(handler)}", flush=True)
+        print(f"[DEBUG] Handler is callable: {callable(handler)}", flush=True)
+        try:
+            sig = inspect.signature(handler)
+            print(f"[DEBUG] Handler signature: {sig}", flush=True)
+        except Exception as e:
+            print(f"[DEBUG] Could not get handler signature: {e}", flush=True)
+        
         sys.stdout.flush()
         
-        result = runpod.serverless.start({"handler": handler})
-        
-        # 在 start() 调用后立即输出（虽然不应该到达这里）
-        print("[INFO] After runpod.serverless.start() call...", flush=True)
-        sys.stdout.flush()
-        
-        # 如果 start() 返回了（不应该发生），记录信息
-        print(f"[WARNING] runpod.serverless.start() returned: {result}", flush=True)
-        print("[WARNING] This should not happen - start() should block forever", flush=True)
+        # 尝试不同的调用方式
+        # 方式1: 标准调用
+        try:
+            print("[INFO] Attempting standard start() call...", flush=True)
+            result = runpod.serverless.start({"handler": handler})
+            print(f"[WARNING] start() returned: {result}", flush=True)
+        except Exception as start_error:
+            print(f"[ERROR] start() raised exception: {start_error}", flush=True)
+            print(f"[ERROR] Exception type: {type(start_error).__name__}", flush=True)
+            import traceback
+            traceback.print_exc(file=sys.stdout)
+            raise
         
     except KeyboardInterrupt:
         print("[INFO] Handler interrupted by user", flush=True)
