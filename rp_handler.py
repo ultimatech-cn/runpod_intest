@@ -233,17 +233,35 @@ if __name__ == "__main__":
         
         sys.stdout.flush()
         
+        # 关键诊断：检查 start() 方法本身
+        print("[DEBUG] Checking runpod.serverless.start method...", flush=True)
+        print(f"[DEBUG] start method type: {type(runpod.serverless.start)}", flush=True)
+        print(f"[DEBUG] start method is callable: {callable(runpod.serverless.start)}", flush=True)
+        
         # 尝试不同的调用方式
         # 方式1: 标准调用
+        print("[INFO] Attempting standard start() call...", flush=True)
+        print("[INFO] NOTE: start() should block and output 'Starting Serverless Worker'", flush=True)
+        print("[INFO] If you see 'Starting Serverless Worker' but no heartbeat, container may be removed", flush=True)
+        sys.stdout.flush()
+        
+        # 在调用前强制刷新所有输出
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
+        
         try:
-            print("[INFO] Attempting standard start() call...", flush=True)
+            # 这是关键调用 - 应该阻塞
             result = runpod.serverless.start({"handler": handler})
+            # 如果到达这里，说明 start() 返回了（不应该发生）
             print(f"[WARNING] start() returned: {result}", flush=True)
+            print("[WARNING] This should not happen - start() should block forever", flush=True)
         except Exception as start_error:
             print(f"[ERROR] start() raised exception: {start_error}", flush=True)
             print(f"[ERROR] Exception type: {type(start_error).__name__}", flush=True)
             import traceback
             traceback.print_exc(file=sys.stdout)
+            sys.stdout.flush()
             raise
         
     except KeyboardInterrupt:
