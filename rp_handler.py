@@ -62,26 +62,22 @@ def run_infer(workflow_file: str) -> Path:
 def handler(job):
     """
     RunPod serverless handler 函数
-    参数: job - 包含 input 字段的字典
-    返回: 处理结果字典
+    根据官方文档: https://docs.runpod.io/serverless/workers/handler-functions
+    job 是一个字典，包含 "id" 和 "input" 字段
     """
     print(f"[INFO] Received job: {type(job)}", flush=True)
+    print(f"[INFO] Job keys: {list(job.keys()) if isinstance(job, dict) else 'N/A'}", flush=True)
     
-    # 兼容不同的参数格式
-    # RunPod 可能传递 job 对象或字典
-    if hasattr(job, "input"):
-        input_data = job.input
-    elif isinstance(job, dict):
-        input_data = job.get("input", {})
-    else:
-        # 如果 job 本身就是 input 数据
-        input_data = job if isinstance(job, dict) else {}
+    # 根据官方文档，job 是一个字典，包含 "id" 和 "input" 字段
+    # job["input"] 包含客户端发送的数据
+    job_input = job["input"]  # 按照官方文档的标准格式
     
-    print(f"[INFO] Input data type: {type(input_data)}", flush=True)
+    print(f"[INFO] Job input type: {type(job_input)}", flush=True)
+    print(f"[INFO] Job input keys: {list(job_input.keys()) if isinstance(job_input, dict) else 'N/A'}", flush=True)
     
     # 从输入中取出 base64 编码的图片和音频
-    image_b64 = input_data.get("image_base64", "") if isinstance(input_data, dict) else ""
-    audio_b64 = input_data.get("audio_base64", "") if isinstance(input_data, dict) else ""
+    image_b64 = job_input.get("image_base64", "")
+    audio_b64 = job_input.get("audio_base64", "")
 
     if not image_b64 or not audio_b64:
         return {"error": "missing image or audio input"}
