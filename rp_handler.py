@@ -89,4 +89,78 @@ def handler(event):
 
 
 if __name__ == "__main__":
-    runpod.serverless.start({"handler": handler})
+    import os
+    import sys
+    import time
+    
+    print("=" * 80, flush=True)
+    print("[INFO] RunPod Handler starting...", flush=True)
+    print("=" * 80, flush=True)
+    
+    print(f"[INFO] Python version: {sys.version}", flush=True)
+    print(f"[INFO] RunPod version: {runpod.__version__ if hasattr(runpod, '__version__') else 'unknown'}", flush=True)
+    
+    # 检查关键环境变量
+    env_vars = ["RUNPOD_POD_ID", "RUNPOD_API_KEY", "RUNPOD_ENDPOINT_ID"]
+    print("[INFO] Checking environment variables:", flush=True)
+    missing_vars = []
+    for var in env_vars:
+        value = os.environ.get(var, "NOT SET")
+        if value == "NOT SET":
+            missing_vars.append(var)
+        # 隐藏敏感信息
+        if "KEY" in var and value != "NOT SET":
+            value = f"{value[:8]}...{value[-4:]}" if len(value) > 12 else "***"
+        print(f"  {var}: {value}", flush=True)
+    
+    if missing_vars:
+        print(f"[WARNING] Missing environment variables: {missing_vars}", flush=True)
+        print("[WARNING] Handler may not work correctly without these variables", flush=True)
+    
+    # 检查所有 RUNPOD 相关的环境变量
+    runpod_envs = {k: v for k, v in os.environ.items() if k.startswith("RUNPOD")}
+    print(f"[INFO] All RUNPOD environment variables: {len(runpod_envs)} found", flush=True)
+    
+    # 检查工作目录和关键路径
+    print("[INFO] Checking workspace paths:", flush=True)
+    workspace_paths = [
+        "/workspace",
+        "/workspace/ComfyUI",
+        "/workspace/workflow",
+        "/workspace/input"
+    ]
+    for path in workspace_paths:
+        exists = os.path.exists(path)
+        print(f"  {path}: {'EXISTS' if exists else 'MISSING'}", flush=True)
+    
+    print("[INFO] Starting RunPod serverless handler...", flush=True)
+    print("[INFO] This is a blocking call - handler will wait for requests...", flush=True)
+    print("=" * 80, flush=True)
+    sys.stdout.flush()
+    
+    # 添加一个启动成功的标记
+    try:
+        print("[INFO] Calling runpod.serverless.start()...", flush=True)
+        print("[INFO] If you see this message, the handler is attempting to start...", flush=True)
+        sys.stdout.flush()
+        
+        # runpod.serverless.start() 是一个阻塞调用，会一直运行等待请求
+        # 它应该启动一个 HTTP 服务器并等待请求
+        runpod.serverless.start({"handler": handler})
+        
+    except KeyboardInterrupt:
+        print("[INFO] Handler interrupted by user", flush=True)
+        sys.exit(0)
+    except SystemExit as e:
+        print(f"[INFO] Handler exited with code: {e.code}", flush=True)
+        raise
+    except Exception as e:
+        print(f"[ERROR] Failed to start RunPod handler: {e}", flush=True)
+        print(f"[ERROR] Exception type: {type(e).__name__}", flush=True)
+        import traceback
+        print("[ERROR] Full traceback:", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        sys.stdout.flush()
+        sys.exit(1)
+    finally:
+        print("[INFO] Handler process ending...", flush=True)
