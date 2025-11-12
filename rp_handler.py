@@ -174,8 +174,27 @@ if __name__ == "__main__":
         
         # 调用 start 方法
         print("[INFO] Calling runpod.serverless.start() now...", flush=True)
+        print("[INFO] Note: runpod.serverless.start() should output 'Starting Serverless Worker'", flush=True)
+        print("[INFO] If you see that message, the handler is starting correctly", flush=True)
         sys.stdout.flush()
         
+        # 使用 threading 在后台定期输出心跳，证明进程还在运行
+        import threading
+        def heartbeat():
+            import time
+            time.sleep(5)  # 等待 start() 初始化
+            count = 0
+            while True:
+                time.sleep(10)  # 每10秒输出一次心跳
+                count += 1
+                print(f"[HEARTBEAT] Handler still running... ({count * 10}s)", flush=True)
+        
+        heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+        heartbeat_thread.start()
+        print("[INFO] Heartbeat thread started - will report every 10 seconds", flush=True)
+        sys.stdout.flush()
+        
+        # 调用 start() - 这是一个阻塞调用
         result = runpod.serverless.start({"handler": handler})
         
         # 如果 start() 返回了（不应该发生），记录信息
